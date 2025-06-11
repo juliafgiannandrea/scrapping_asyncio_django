@@ -77,6 +77,8 @@ with st.form("filtros_form"):
     submit = st.form_submit_button("Executar scraping")
 
 if submit:
+        # Limpa resultados anteriores
+    st.session_state.df = None
     filtros = {
         "tipo_operacao": tipo_operacao,
         "tipo_imovel": tipo_imovel,
@@ -88,8 +90,6 @@ if submit:
         "palavra_chave": palavra_chave
     }
     
-
-    st.session_state.scraping_status = "Scraping em andamento..."
     threading.Thread(
         target=executar_scraping_e_carregar_df,
         args=(filtros,),
@@ -98,29 +98,24 @@ if submit:
     st.success("Scraping iniciado. Clique em 'Consultar resultados' depois de alguns segundos.")
         
 
-
 #botões:
-if st.button("📦 Visualizar todos os imóveis do banco"):
+if st.button("Visualizar todos os imóveis do banco"):
     carregar_todos_os_imoveis()
 
 if st.button("Consultar resultados"):
-    if "scraping_status" in st.session_state:
-        st.info(st.session_state.scraping_status)
-
     try:
         response = requests.get(f"{API_URL}/resultados-atuais")
         if response.status_code == 200:
             dados = response.json()
             if dados:
                 st.session_state.df = pd.DataFrame(dados)
-                st.dataframe(st.session_state.df)
+            
             else:
                 st.warning("Ainda não há resultados disponíveis.")
         else:
             st.error("Erro ao buscar resultados.")
     except Exception as e:
         st.error(f"Erro ao consultar resultados: {e}")
-
 
 if st.session_state.df is not None and not st.session_state.df.empty:
     st.subheader("Resultado da Busca")
@@ -135,5 +130,3 @@ if st.session_state.df is not None and not st.session_state.df.empty:
                 st.error("Erro ao salvar os dados no banco.")
         except Exception as e:
             st.error(f"Erro ao salvar: {e}")
-
-    

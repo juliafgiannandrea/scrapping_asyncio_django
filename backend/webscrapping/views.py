@@ -11,7 +11,8 @@ from webscrapping.scraping.tratamento import tratar_dataframe
 from webscrapping.scraping.filtros import aplicar_filtros
 from django.http import JsonResponse
 import requests 
-
+import json
+import tempfile
 
 @sync_to_async
 def salvar_no_banco_async(dados):
@@ -39,9 +40,6 @@ async def salvar_dados(request, dados: list[ImovelIn]):
     else:
         return {"mensagem": f"{novos} registros salvos com sucesso."}
 
-async def exportar_excel(request, dados: list[ImovelIn]):
-    path = await exportar_excel_async(dados)
-    return {"mensagem": "Arquivo Excel exportado com sucesso.", "arquivo": path}
 
 @sync_to_async
 def listar_todos_async():
@@ -52,23 +50,10 @@ async def listar_imoveis(request):
     return JsonResponse(dados, safe=False)
 
 
-
-
-
-
-
-
-from pathlib import Path
-import json
-
-import tempfile
-from pathlib import Path
-import json
-
-# Caminho seguro e multiplataforma para arquivo temporário
 ARQUIVO_RESULTADOS = Path(tempfile.gettempdir()) / "resultados_scraping.json"
 
 async def executar_scraping_e_retornar(filtros: FiltroScraping):
+    ARQUIVO_RESULTADOS.write_text("[]", encoding="utf-8") #para apagar resultados de busca anteriores 
     driver = iniciar_navegador(headless=True)
     try:
         aplicar_filtros(driver, **filtros.dict())
@@ -77,11 +62,11 @@ async def executar_scraping_e_retornar(filtros: FiltroScraping):
 
         # salvar os resultados no arquivo temporário
         ARQUIVO_RESULTADOS.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
-        
-        
         return dados
     except Exception as e:
         print(f"Erro ao executar scraping: {e}")
         return []
     finally:
         driver.quit()
+
+

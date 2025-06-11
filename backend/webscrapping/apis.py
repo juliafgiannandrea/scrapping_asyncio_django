@@ -14,10 +14,6 @@ router = Router()
 async def salvar_dados(request, dados: List[ImovelIn]):
     return await views.salvar_dados(request, dados)
 
-@router.post("/exportar-excel")
-async def exportar_excel(request, dados: List[ImovelIn]):
-    return await views.exportar_excel(request, dados)
-
 @router.get("/imoveis", response=List[ImovelOut])
 async def listar_imoveis(request):
     return await views.listar_imoveis(request)
@@ -27,7 +23,6 @@ async def listar_imoveis(request):
 async def iniciar_scraping(request, filtros: FiltroScraping):
     asyncio.create_task(views.executar_scraping_e_retornar(filtros))
     return {"mensagem": "Scraping iniciado em segundo plano."}
-
 
 @router.get("/resultados-atuais")
 def obter_resultados_atuais(request):
@@ -40,3 +35,5 @@ def obter_resultados_atuais(request):
         with caminho.open(encoding="utf-8") as f:
             return json.load(f)
     return []
+
+
