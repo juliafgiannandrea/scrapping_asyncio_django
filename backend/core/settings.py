@@ -92,15 +92,15 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'db_escola',
         'USER' : 'root',
-        'PASSWORD':'2709Lucas',
+        'PASSWORD':'1234',
         'HOST':'localhost', #ou o IP do servidor
         'PORT':'3306',
     },
     'imoveis':{
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'db_imoveis',
+        'NAME': 'db1_imoveis',
         'USER' : 'root',
-        'PASSWORD':'2709Lucas',
+        'PASSWORD':'1234',
         'HOST':'localhost', #ou o IP do servidor
         'PORT':'3306',
     }

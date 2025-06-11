@@ -9,6 +9,9 @@ from webscrapping.scraping.navegador import iniciar_navegador
 from webscrapping.scraping.extrator import extrair_dados
 from webscrapping.scraping.tratamento import tratar_dataframe
 from webscrapping.scraping.filtros import aplicar_filtros
+from django.http import JsonResponse
+
+
 
 @sync_to_async
 def salvar_no_banco_async(dados):
@@ -28,43 +31,64 @@ def exportar_excel_async(dados):
     df.to_excel(filename, index=False)
     return str(filename)
 
-@sync_to_async
-def listar_todos_async():
-    return list(Imoveis.objects.all().values())
 
 async def salvar_dados(request, dados: list[ImovelIn]):
     novos = await salvar_no_banco_async(dados)
-    return {"mensagem": f"{novos} registros salvos com sucesso."}
+    if novos == 0:
+        return {"mensagem": "Imóveis já cadastrados."}
+    else:
+        return {"mensagem": f"{novos} registros salvos com sucesso."}
 
 async def exportar_excel(request, dados: list[ImovelIn]):
     path = await exportar_excel_async(dados)
     return {"mensagem": "Arquivo Excel exportado com sucesso.", "arquivo": path}
 
+
+
+@sync_to_async
+def listar_todos_async():
+    return list(Imoveis.objects.all().values())
+
 async def listar_imoveis(request):
     dados = await listar_todos_async()
-    return dados
+    return JsonResponse(dados, safe=False)
 
-async def executar_scraping(request, filtros: FiltroScraping):
-    loop = asyncio.get_event_loop()
 
+#para exibir os resultados da busca no front na hora 
+async def executar_scraping_e_retornar(filtros: FiltroScraping):
+    driver = iniciar_navegador(headless=True)
+    try:
+        aplicar_filtros(driver, **filtros.dict())
+        df = extrair_dados(driver)
+        dados = tratar_dataframe(df).to_dict(orient="records")    
+
+        return dados  # <-- aqui está o retorno direto dos dados da busca
+    except Exception as e:
+        print(f"Erro ao executar scraping: {e}")
+        return []
+    finally:
+        driver.quit()
+
+
+
+
+
+import uuid
+
+resultados_temp = {}  # DICIONÁRIO EM MEMÓRIA TEMPORÁRIO
+
+async def executar_scraping_em_background(filtros: FiltroScraping, task_id: str):
     def tarefa():
-        driver = iniciar_navegador(headless=True)
         try:
-            aplicar_filtros(
-                driver,
-                tipo_operacao=filtros.tipo_operacao,
-                tipo_imovel=filtros.tipo_imovel,
-                localizacao=filtros.localizacao,
-                cidade=filtros.cidade,
-                bairro=filtros.bairro,
-                quartos=filtros.quartos,
-                preco_medio=filtros.preco_medio,
-                palavra_chave=filtros.palavra_chave,
-            )
+            driver = iniciar_navegador(headless=True)
+            aplicar_filtros(driver, **filtros.dict())
             df = extrair_dados(driver)
-            return tratar_dataframe(df).to_dict(orient="records")
+            dados = tratar_dataframe(df).to_dict(orient="records")
+            resultados_temp[task_id] = dados
+        except Exception as e:
+            print(f"Erro no scraping: {e}")
+            resultados_temp[task_id] = []
         finally:
             driver.quit()
 
-    resultado = await loop.run_in_executor(None, tarefa)
-    return resultado
+    asyncio.create_task(asyncio.to_thread(tarefa))

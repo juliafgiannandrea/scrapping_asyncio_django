@@ -8,3 +8,7 @@ def iniciar_navegador(headless=False):
         options.add_argument("--headless")
     driver = webdriver.Chrome(options=options)
     return driver
+
+
+
+

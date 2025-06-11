@@ -8,28 +8,35 @@ def aplicar_filtros(driver, tipo_operacao="", tipo_imovel="", localizacao="", ci
     wait = WebDriverWait(driver, 10)
     driver.get("https://dfimoveis.com.br")
 
+    # Aceitar cookies
+    try:
+        botao_cookies = wait.until(EC.element_to_be_clickable((By.ID, "btn-lgpd")))
+        botao_cookies.click()
+        sleep(1)
+    except:
+        pass
+
     def selecionar_opcao(indice, texto):
-        elementos = driver.find_elements(By.CLASS_NAME, "select2-selection--single")
-        if len(elementos) > indice:
-            elementos[indice].click()
+        # Alvo: elementos que abrem o combo
+        combos = driver.find_elements(By.CSS_SELECTOR, "span.select2-selection__rendered")
+        if len(combos) > indice:
+            combos[indice].click()
             campo = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "select2-search__field")))
             campo.send_keys(texto)
             campo.send_keys(Keys.ENTER)
             sleep(1)
+        else:
+            print(f"⚠️ Combo index {indice} fora do range [{len(combos)}]")
 
-    if tipo_operacao: 
+    if tipo_operacao:
         selecionar_opcao(0, tipo_operacao)
-    
-    if tipo_imovel: 
+    if tipo_imovel:
         selecionar_opcao(1, tipo_imovel)
-    
-    if localizacao: 
+    if localizacao:
         selecionar_opcao(2, localizacao)
-    
-    if cidade: 
+    if cidade:
         selecionar_opcao(3, cidade)
-    
-    if bairro: 
+    if bairro:
         selecionar_opcao(4, bairro)
 
     if quartos:
@@ -54,6 +61,8 @@ def aplicar_filtros(driver, tipo_operacao="", tipo_imovel="", localizacao="", ci
         campo.send_keys(palavra_chave)
         sleep(1)
 
+    # Botão de busca
     botao_buscar = wait.until(EC.element_to_be_clickable((By.ID, "botaoDeBusca")))
     botao_buscar.click()
     sleep(5)
+
