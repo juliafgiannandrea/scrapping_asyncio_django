@@ -10,7 +10,7 @@ from webscrapping.scraping.extrator import extrair_dados
 from webscrapping.scraping.tratamento import tratar_dataframe
 from webscrapping.scraping.filtros import aplicar_filtros
 from django.http import JsonResponse
-
+import requests 
 
 
 @sync_to_async
@@ -43,8 +43,6 @@ async def exportar_excel(request, dados: list[ImovelIn]):
     path = await exportar_excel_async(dados)
     return {"mensagem": "Arquivo Excel exportado com sucesso.", "arquivo": path}
 
-
-
 @sync_to_async
 def listar_todos_async():
     return list(Imoveis.objects.all().values())
@@ -54,41 +52,36 @@ async def listar_imoveis(request):
     return JsonResponse(dados, safe=False)
 
 
-#para exibir os resultados da busca no front na hora 
+
+
+
+
+
+
+from pathlib import Path
+import json
+
+import tempfile
+from pathlib import Path
+import json
+
+# Caminho seguro e multiplataforma para arquivo temporário
+ARQUIVO_RESULTADOS = Path(tempfile.gettempdir()) / "resultados_scraping.json"
+
 async def executar_scraping_e_retornar(filtros: FiltroScraping):
     driver = iniciar_navegador(headless=True)
     try:
         aplicar_filtros(driver, **filtros.dict())
         df = extrair_dados(driver)
-        dados = tratar_dataframe(df).to_dict(orient="records")    
+        dados = tratar_dataframe(df).to_dict(orient="records")
 
-        return dados  # <-- aqui está o retorno direto dos dados da busca
+        # salvar os resultados no arquivo temporário
+        ARQUIVO_RESULTADOS.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
+        
+        
+        return dados
     except Exception as e:
         print(f"Erro ao executar scraping: {e}")
         return []
     finally:
         driver.quit()
-
-
-
-
-
-import uuid
-
-resultados_temp = {}  # DICIONÁRIO EM MEMÓRIA TEMPORÁRIO
-
-async def executar_scraping_em_background(filtros: FiltroScraping, task_id: str):
-    def tarefa():
-        try:
-            driver = iniciar_navegador(headless=True)
-            aplicar_filtros(driver, **filtros.dict())
-            df = extrair_dados(driver)
-            dados = tratar_dataframe(df).to_dict(orient="records")
-            resultados_temp[task_id] = dados
-        except Exception as e:
-            print(f"Erro no scraping: {e}")
-            resultados_temp[task_id] = []
-        finally:
-            driver.quit()
-
-    asyncio.create_task(asyncio.to_thread(tarefa))

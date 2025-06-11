@@ -11,44 +11,6 @@ st.title("Scraping de Imóveis com Django + Streamlit")
 if "df" not in st.session_state:
     st.session_state.df = None
 
-# Função para disparar scraping em background
-def executar_scraping_e_carregar_df(filtros):
-    try:
-        response = requests.post(f"{API_URL}/executar-e-retornar", json=filtros)
-        if response.status_code == 200:
-            dados = response.json()
-            if dados:
-                st.session_state.df = pd.DataFrame(dados)
-                st.success(f"{len(dados)} imóveis encontrados.")
-            else:
-                st.warning("Nenhum imóvel encontrado.")
-        else:
-            st.error(f"Erro no scraping: {response.status_code}")
-    except Exception as e:
-        st.error(f"Erro ao executar scraping: {e}")
-
-
-
-
-
-# # Função para buscar os dados prontos do banco
-# def consultar_resultados():
-#     try:
-#         response = requests.get(f"{API_URL}/imoveis")
-#         if response.status_code == 200:
-#             dados = response.json()
-#             if dados:
-#                 st.session_state.df = pd.DataFrame(dados)
-#                 st.success(f"{len(dados)} imóveis carregados do banco.")
-#             else:
-#                 st.warning("Nenhum dado encontrado no banco ainda.")
-#         else:
-#             st.error("Erro ao consultar o banco.")
-#     except Exception as e:
-#         st.error(f"Erro ao buscar resultados: {e}")
-
-
-# Função para salvar os dados exibidos
 def salvar_no_banco(dados):
     try:
         response = requests.post(f"{API_URL}/salvar-dados", json=dados)
@@ -62,7 +24,6 @@ def salvar_no_banco(dados):
             st.error("Erro ao salvar os dados.")
     except Exception as e:
         st.error(f"Erro ao salvar no banco: {e}")
-
 
 def carregar_todos_os_imoveis():
     try:
@@ -78,6 +39,24 @@ def carregar_todos_os_imoveis():
             st.error(f"Erro ao buscar imóveis: {response.status_code}")
     except Exception as e:
         st.error(f"Erro ao buscar imóveis: {e}")
+
+
+# Função para disparar scraping em background
+def executar_scraping_e_carregar_df(filtros):
+    try:
+        response = requests.post(f"{API_URL}/executar-scraping", json=filtros)
+        if response.status_code == 200:
+            dados = response.json()
+            if dados:
+                st.session_state.df = pd.DataFrame(dados)
+                st.session_state.scraping_status = f"{len(dados)} imóveis carregados com sucesso."
+            else:
+                st.session_state.scraping_status = "Nenhum dado retornado."
+        else:
+            st.session_state.scraping_status = f"Erro no scraping: {response.status_code}"
+    except Exception as e:
+        st.session_state.scraping_status = f"Erro ao executar scraping: {e}"
+
 
 # Formulário de filtros
 with st.form("filtros_form"):
@@ -108,49 +87,53 @@ if submit:
         "preco_medio": preco_medio,
         "palavra_chave": palavra_chave
     }
+    
 
-    with st.spinner("⏳ Executando scraping... isso pode levar alguns segundos."):
-        executar_scraping_e_carregar_df(filtros)
-
-
-# if st.button("📦 Visualizar todos os imóveis do banco"):
-#     carregar_todos_os_imoveis()
-
-# # Exibição dos resultados
-# if st.session_state.df is not None:
-#     st.subheader("Resultado da Busca")
-#     st.dataframe(st.session_state.df, use_container_width=True)
-
-#     if st.button("Salvar no banco"):
-#         salvar_no_banco(st.session_state.df.to_dict(orient="records"))
+    st.session_state.scraping_status = "Scraping em andamento..."
+    threading.Thread(
+        target=executar_scraping_e_carregar_df,
+        args=(filtros,),
+        daemon=True
+    ).start()
+    st.success("Scraping iniciado. Clique em 'Consultar resultados' depois de alguns segundos.")
+        
 
 
-
-# Se uma tarefa assíncrona estiver em andamento, verifica o status
-if "task_id" in st.session_state:
-    try:
-        response = requests.get(f"{API_URL}/resultado-tarefa/" + st.session_state.task_id)
-        if response.status_code == 200:
-            resultado = response.json()
-            if resultado["status"] == "done":
-                st.session_state.df = pd.DataFrame(resultado["dados"])
-                st.success(f"{len(resultado['dados'])} imóveis encontrados.")
-                del st.session_state.task_id
-            else:
-                st.info("⏳ Scraping ainda em andamento... clique em 'Atualizar resultados' abaixo.")
-                if st.button("🔄 Atualizar resultados"):
-                    st.experimental_rerun()
-    except Exception as e:
-        st.error(f"Erro ao buscar resultado da tarefa: {e}")
-
-# Botão para visualizar todos os imóveis cadastrados no banco
+#botões:
 if st.button("📦 Visualizar todos os imóveis do banco"):
     carregar_todos_os_imoveis()
 
-# Exibição dos resultados da busca
-if st.session_state.df is not None:
+if st.button("Consultar resultados"):
+    if "scraping_status" in st.session_state:
+        st.info(st.session_state.scraping_status)
+
+    try:
+        response = requests.get(f"{API_URL}/resultados-atuais")
+        if response.status_code == 200:
+            dados = response.json()
+            if dados:
+                st.session_state.df = pd.DataFrame(dados)
+                st.dataframe(st.session_state.df)
+            else:
+                st.warning("Ainda não há resultados disponíveis.")
+        else:
+            st.error("Erro ao buscar resultados.")
+    except Exception as e:
+        st.error(f"Erro ao consultar resultados: {e}")
+
+
+if st.session_state.df is not None and not st.session_state.df.empty:
     st.subheader("Resultado da Busca")
     st.dataframe(st.session_state.df, use_container_width=True)
 
     if st.button("Salvar no banco"):
-        salvar_no_banco(st.session_state.df.to_dict(orient="records"))
+        try:
+            response = requests.post(f"{API_URL}/salvar-dados", json=st.session_state.df.to_dict(orient="records"))
+            if response.status_code == 200:
+                st.success(response.json().get("mensagem", "Dados salvos com sucesso."))
+            else:
+                st.error("Erro ao salvar os dados no banco.")
+        except Exception as e:
+            st.error(f"Erro ao salvar: {e}")
+
+    
