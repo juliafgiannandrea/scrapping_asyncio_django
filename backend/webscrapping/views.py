@@ -14,24 +14,14 @@ import requests
 import json
 import tempfile
 
-@sync_to_async
-def salvar_no_banco_async(dados):
-    novos = 0
-    for item in dados:
-        if not Imoveis.objects.filter(link=item.link).exists():
-            Imoveis.objects.create(**item.dict(), data_extracao=now())
-            novos += 1
-    return novos
-
-@sync_to_async
-def exportar_excel_async(dados):
-    df = pd.DataFrame([item.dict() for item in dados])
-    path = Path("data")
-    path.mkdir(exist_ok=True)
-    filename = path / f"imoveis_{now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-    df.to_excel(filename, index=False)
-    return str(filename)
-
+# @sync_to_async
+# def salvar_no_banco_async(dados):
+#     novos = 0
+#     for item in dados:
+#         if Imoveis.objects.filter(link=item.link).exists():
+#             Imoveis.objects.create(**item.dict(), data_extracao=now())
+#             novos += 1
+#     return novos
 
 async def salvar_dados(request, dados: list[ImovelIn]):
     novos = await salvar_no_banco_async(dados)
@@ -39,6 +29,34 @@ async def salvar_dados(request, dados: list[ImovelIn]):
         return {"mensagem": "Imóveis já cadastrados."}
     else:
         return {"mensagem": f"{novos} registros salvos com sucesso."}
+
+
+@sync_to_async
+def salvar_no_banco_async(dados):
+    novos = 0
+    for item in dados:
+        # Converte para dicionário
+        dados_dict = item.dict()
+
+        # Verifica se todos os campos (exceto o link) são "N/A" ou vazios
+        somente_na = all(
+            valor in ["N/A", None, ""] for chave, valor in dados_dict.items() if chave != "link"
+        )
+
+        # Se TODOS os campos (exceto o link) forem N/A, ignora
+        if somente_na:
+            continue
+
+        # Se passou na verificação, salva normalmente
+        if not Imoveis.objects.filter(link=item.link).exists():
+            Imoveis.objects.create(**dados_dict, data_extracao=now())
+            novos += 1
+
+    return novos
+
+
+
+
 
 
 @sync_to_async
